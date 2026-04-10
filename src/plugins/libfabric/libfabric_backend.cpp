@@ -298,12 +298,12 @@ nixlLibfabricEngine::nixlLibfabricEngine(const nixlBackendInitParams *init_param
     NIXL_DEBUG << "Initializing Libfabric Backend";
 
     // Compute compact sender ID from agent UUID for cross-process uniqueness.
-    // Each NIXL agent has a unique UUID name. XOR-fold all bytes to 8 bits.
-    // With only 2-3 senders per receiver (PP ranks), collision probability is <1%.
+    // Use std::hash for better distribution than simple XOR-fold.
+    // With 16 agents and 8-bit hash, birthday collision probability ~36% per deployment,
+    // but each decode TP worker only needs to distinguish its 2 senders (PP ranks).
+    // Per-pair collision probability = 1/256 = 0.4%.
     {
-        uint8_t id = 0;
-        for (char c : localAgent) id ^= static_cast<uint8_t>(c);
-        my_sender_id_ = id;
+        my_sender_id_ = static_cast<uint8_t>(std::hash<std::string>()(localAgent) & 0xFF);
         NIXL_INFO << "Agent " << localAgent << " sender_id=" << static_cast<int>(my_sender_id_);
     }
 
@@ -721,23 +721,23 @@ nixlLibfabricEngine::registerMem(const nixlBlobDesc &mem,
             if (cuda_addr_wa_) {
                 bool need_restart;
                 if (vramUpdateCtx((void *)mem.addr, mem.devId, need_restart)) {
-                    NIXL_INFO << "Multi-GPU detected (device " << mem.devId
-                              << "), using cudaSetDevice fallback";
-                    cuda_addr_wa_ = false;
+                    NIXL_WARN << "CUDA address workaround failed for device " << mem.devId
+                              << ", disabling workaround for multi-GPU support";
+                    cuda_addr_wa_ = false; // Disable workaround for subsequent registrations
                 } else if (need_restart) {
+                    // Restart progress thread if needed
                     NIXL_DEBUG << "CUDA context updated, restarting progress thread";
                     vramApplyCtx();
                 }
-            }
-            // Fallback: set device via runtime API (uses primary context)
-            if (!cuda_addr_wa_) {
+            } else {
+                // Set CUDA device context directly for multi-GPU support
                 cudaError_t cuda_ret = cudaSetDevice(mem.devId);
                 if (cuda_ret != cudaSuccess) {
                     NIXL_ERROR << "Failed to set CUDA device " << mem.devId << ": "
                                << cudaGetErrorString(cuda_ret);
                     return NIXL_ERR_NOT_SUPPORTED;
                 }
-                NIXL_INFO << "Set CUDA device context to GPU " << mem.devId;
+                NIXL_DEBUG << "Set CUDA device context to GPU " << mem.devId;
             }
 
             // Query PCI bus ID from memory address (AFTER setting context)

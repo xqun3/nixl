@@ -231,16 +231,18 @@ private:
         uint8_t sender_agent_idx;
         uint16_t notif_xfer_id;
 
-        bool operator==(const PendingNotifKey &other) const {
-            return sender_agent_idx == other.sender_agent_idx &&
-                   notif_xfer_id == other.notif_xfer_id;
+        bool
+        operator==(const PendingNotifKey &other) const {
+            return sender_agent_idx == other.sender_agent_idx
+                   && notif_xfer_id == other.notif_xfer_id;
         }
     };
 
     struct PendingNotifKeyHash {
-        size_t operator()(const PendingNotifKey &k) const {
-            return std::hash<uint32_t>()(
-                (static_cast<uint32_t>(k.sender_agent_idx) << 16) | k.notif_xfer_id);
+        size_t
+        operator()(const PendingNotifKey &k) const {
+            return std::hash<uint32_t>()(static_cast<uint32_t>(k.sender_agent_idx) << 16
+                                         | k.notif_xfer_id);
         }
     };
 
@@ -268,7 +270,8 @@ private:
     };
 
     // O(1) lookup with postXferID key
-    std::unordered_map<PendingNotifKey, PendingNotification, PendingNotifKeyHash> pending_notifications_;
+    std::unordered_map<PendingNotifKey, PendingNotification, PendingNotifKeyHash>
+        pending_notifications_;
 
     // Connection management helpers
     nixl_status_t

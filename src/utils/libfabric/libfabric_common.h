@@ -96,7 +96,7 @@
 constexpr inline uint64_t NIXL_LIBFABRIC_GIGA = 1000ull * 1000ull * 1000ull;
 
 /**
- * @brief Notification header for all fragments (10 bytes)
+ * @brief Notification header for all fragments (12 bytes)
  *
  * This is present in every fragment and contains only the essential
  * fields needed for fragment identification and reassembly.
